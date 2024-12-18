@@ -162,6 +162,70 @@ const handleDecryptImage = async () => {
           />
         </section>
       )}
+
+      {/* Uploaded Image Preview */}
+      {image && (
+        <section className="flex flex-col items-center">
+          <img
+            src={URL.createObjectURL(image)}
+            alt="Uploaded Preview"
+            className="w-72 h-72 object-cover rounded mb-4"
+          />
+          <p className="text-sm text-gray-600">File Name: {image.name}</p>
+          <p className="text-sm text-gray-600">
+            File Size: {(image.size / 1024).toFixed(2)} KB
+          </p>
+          <button
+            onClick={handleEncryptImage}
+            className="bg-blue-500 hover:bg-blue-600 text-white rounded w-80 h-12 mt-4"
+            disabled={loading}
+          >
+            {loading ? "Encrypting..." : "Encrypt Image"}
+          </button>
+        </section>
+      )}
+
+      {/* Encrypted Image Preview */}
+      {encryptedImageUrl && (
+        <section className="flex flex-col items-center mt-4">
+          <h3 className="text-lg font-semibold">Encrypted Image</h3>
+          <img
+            src={encryptedImageUrl}
+            alt="Encrypted Preview"
+            className="w-72 h-72 object-cover rounded mb-2"
+          />
+          <p className="text-sm text-gray-600">Encryption Key: {encryptionKey}</p>
+          <button
+            onClick={handleDecryptImage}
+            className="bg-green-500 hover:bg-green-600 text-white rounded w-80 h-12 mt-4"
+            disabled={loading}
+          >
+            {loading ? "Decrypting..." : "Decrypt Image"}
+          </button>
+        </section>
+      )}
+
+      {/* Decrypted Image Preview */}
+      {decryptedImageUrl && (
+        <section className="flex flex-col items-center mt-4">
+          <h3 className="text-lg font-semibold">Decrypted Image</h3>
+          <img
+            src={decryptedImageUrl}
+            alt="Decrypted Preview"
+            className="w-72 h-72 object-cover rounded mb-2"
+          />
+        </section>
+      )}
+
+      {/* Reset Button */}
+      {(image || encryptedImageUrl || decryptedImageUrl) && (
+        <button
+          onClick={handleRemoveAll}
+          className="bg-red-500 hover:bg-red-600 text-white rounded w-80 h-12 mt-4"
+        >
+          Remove All
+        </button>
+      )}
     </main>
   );
 }
