@@ -7,16 +7,16 @@ type ImageFile = File | null;
 
 export default function Home() {
   const [image, setImage] = useState<ImageFile>(null);
-  const [encryptedImageURL, setEncryptedImageURL] = useState<string | null>(null);
-  const [decryptedImageURL, setDecryptedImageURL] = useState<string | null>(null);
+  const [encryptedImageUrl, setEncryptedImageUrl] = useState<string | null>(null);
+  const [decryptedImageUrl, setDecryptedImageUrl] = useState<string | null>(null);
   const [encryptionKey, setEncryptionKey] = useState<string | null>(null);
-	  const [dataLength, setDataLength] = useState<number| null>(null);
+  const [ivector, setIV] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-	const flaskUrl = process.env.NEXT_PUBLIC_LOCAL_URL;
+  const BASE_URL = "http://localhost:5000"; // Replace with your API base URL
 
-console.log(flaskUrl);
-
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle image upload
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (
       file &&
@@ -25,127 +25,91 @@ console.log(flaskUrl);
         file.type === "image/jpg")
     ) {
       setImage(file);
-      setEncryptedImageURL(null);
-      setDecryptedImageURL(null);
-      setEncryptionKey(null);
     } else {
       alert("Please upload a valid image file (jpg, jpeg, or png).");
     }
   };
-const handleEncryptImage = async () => {
-  if (!image) return;
 
-  const formData = new FormData();
-  formData.append("image", image);
+  // Handle image encryption
+  const handleEncryptImage = async () => {
+    if (!image) return alert("Please upload an image first.");
 
-  try {
-    const response = await axios.post(`${flaskUrl}/encrypt-image`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-      responseType: "blob",
-    });
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", image);
 
-    const encryptionKey = response.headers["x-encryption-key"]; 
-    const dataLength = response.headers["x-data-length"];
+      const response = await axios.post(`${BASE_URL}/encrypt-image`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        responseType: "blob", // Expect binary data as response
+      });
 
-    const blob = response.data; // No need to re-wrap as a Blob
-    const encryptedImageURL = URL.createObjectURL(blob);
+      const key = response.headers["x-encryption-key"];
+      const iv = response.headers["x-iv"];
+      console.log(response.headers);
+      if (!key) throw new Error("No encryption key returned.");
+      if (!iv) throw new Error("No iv")
+      // Convert encrypted blob to URL
+      const encryptedUrl = URL.createObjectURL(response.data);
+      setEncryptedImageUrl(encryptedUrl);
+      setEncryptionKey(key);
+      setIV(iv);
+      setImage(null); // Remove original image
+    } catch (error) {
+      console.error("Encryption failed:", error);
+      alert("Encryption failed. Check console for details.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    setEncryptedImageURL(encryptedImageURL);
-    setEncryptionKey(encryptionKey);
-    setDataLength(dataLength);
-    
-  } catch (error) {
-    console.error("Encryption failed:", error);
-    alert(`Failed to encrypt the image. Error: ${error.message}`);
-  }
-};
+  // Handle image decryption
+  const handleDecryptImage = async () => {
+    if (!encryptedImageUrl || !encryptionKey || !ivector) {
+      return alert("No encrypted image or key available or ivector available.");
+    }
 
-const handleDecryptImage = async () => {
-  if (!encryptedImageURL || !encryptionKey) {
-    alert("Please encrypt the image first.");
-    return;
-  }
+    setLoading(true);
+    try {
+      const encryptedBlob = await fetch(encryptedImageUrl).then((res) =>
+        res.blob()
+      );
+      const formData = new FormData();
+      formData.append("file", encryptedBlob, "encrypted_image.png");
+      formData.append("key", encryptionKey);
+      formData.append("iv",ivector);
 
-  try {
-    const response = await fetch(encryptedImageURL);
-    const encryptedBlob = await response.blob();
+      const response = await axios.post(`${BASE_URL}/decrypt-image`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        responseType: "blob", // Expect binary data as response
+      });
 
-    const formData = new FormData();
-    formData.append("file", encryptedBlob, "encrypted_image.png");
-    formData.append("key", encryptionKey); 
+      // Convert decrypted blob to URL
+      const decryptedUrl = URL.createObjectURL(response.data);
+      setDecryptedImageUrl(decryptedUrl);
+    } catch (error) {
+      console.error("Decryption failed:", error);
+      alert("Decryption failed. Check console for details.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const decryptResponse = await axios.post(`${flaskUrl}/decrypt-image`, formData, {
-      responseType: "blob",
-      headers: { "X-Data-Length": dataLength },
-    });
-
-    const blob = decryptResponse.data;
-    const decryptedURL = URL.createObjectURL(blob);
-
-    setDecryptedImageURL(decryptedURL);
-  } catch (error) {
-    console.error("Decryption failed:", error);
-    alert(`Failed to decrypt the image. Error: ${error.message}`);
-  }
-};
-
-
-  const handleRemoveImage = () => {
+  // Handle removing all images
+  const handleRemoveAll = () => {
     setImage(null);
-    setEncryptedImageURL(null);
-    setDecryptedImageURL(null);
+    setEncryptedImageUrl(null);
+    setDecryptedImageUrl(null);
     setEncryptionKey(null);
+    setIV(null);
   };
 
   return (
-    <main className="w-full flex flex-col justify-between pt-5">
-      {image ? (
-        <section className="flex flex-col">
-          <img
-            src={URL.createObjectURL(image)}
-            alt="Uploaded Preview"
-            className="w-72 h-72 object-cover rounded mb-4"
-          />
-          <p className="text-sm text-gray-600">File Name: {image.name}</p>
-          <p className="text-sm text-gray-600">
-            File Size: {(image.size / 1024).toFixed(2)} KB
-          </p>
-          <button
-            onClick={handleEncryptImage}
-            className="bg-blue-400 hover:bg-blue-600 text-white rounded w-80 h-12 mt-4"
-          >
-            Encrypt Image
-          </button>
-          {encryptedImageURL && (
-            <div>
-              <img
-                src={encryptedImageURL}
-                alt="Encrypted Preview"
-                className="w-72 h-72 object-cover rounded mt-4"
-              />
-              <button
-                onClick={handleDecryptImage}
-                className="bg-green-400 hover:bg-green-600 text-white rounded w-80 h-12 mt-4"
-              >
-                Decrypt Image
-              </button>
-            </div>
-          )}
-          {decryptedImageURL && (
-            <img
-              src={decryptedImageURL}
-              alt="Decrypted Preview"
-              className="w-72 h-72 object-cover rounded mt-4"
-            />
-          )}
-          <button
-            onClick={handleRemoveImage}
-            className="bg-red-400 hover:bg-red-600 text-white rounded w-80 h-12 mt-4"
-          >
-            Remove Image
-          </button>
-        </section>
-      ) : (
+    <main className="w-full flex flex-col items-center justify-center pt-5">
+      <h1 className="text-2xl font-bold mb-4">Image Encryption and Decryption</h1>
+
+      {/* Upload Image */}
+      {!image && !encryptedImageUrl && (
         <section className="flex flex-col">
           <label
             htmlFor="imageUpload"
