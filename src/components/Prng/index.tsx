@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 
 type ImageFile = File | null;
@@ -23,15 +23,35 @@ export default function Home() {
     string,
     string
   > | null>(null);
+  const [multiResult, setMultiResult] = useState<Record<string, string> | null>(
+    null,
+  );
   const [plotresult, setPlotResult] = useState<Record<string, string> | null>(
     null,
   );
   const [loading, setLoading] = useState(false);
   const [ploting, setPloting] = useState(false);
+  const [multing, setMulting] = useState(false);
 
   const BASE_URL = "http://127.0.0.1:5000"; // Replace with your API base URL
 
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  useEffect(() => {
+    // Define the asynchronous function inside useEffect
+    const fetchEncryptionKey = async () => {
+      try {
+        const response = await axios.get(`${BASE_URL}/generate-key`);
+        console.log(response);
+        const key = response.data.key;
+        console.log(key);
+        setEncryptionKey(key);
+      } catch (error) {
+        console.error("Error fetching encryption key:", error);
+      }
+    };
+
+    fetchEncryptionKey(); // Call the function when the component mounts
+  }, []);
 
   // Handle image upload
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,7 +60,8 @@ export default function Home() {
       file &&
       (file.type === "image/jpeg" ||
         file.type === "image/png" ||
-        file.type === "image/jpg")
+        file.type === "image/jpg" ||
+        file.type === "image/tiff")
     ) {
       setImage(file);
       setUploadedImageUrl(URL.createObjectURL(file)); // Generate and store the URL once
@@ -56,21 +77,21 @@ export default function Home() {
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append("image", image);
+      if (image && encryptionKey) {
+        formData.append("image", image);
+        formData.append("key", encryptionKey);
+      }
 
       const response = await axios.post(`${BASE_URL}/encrypt-image`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         responseType: "blob", // Expect binary data as response
       });
 
-      const key = response.headers["x-encryption-key"];
       const iv = response.headers["x-iv"];
-      if (!key) throw new Error("No encryption key returned.");
       if (!iv) throw new Error("No iv");
 
       const encryptedUrl = URL.createObjectURL(response.data);
       setEncryptedImageUrl(encryptedUrl);
-      setEncryptionKey(key);
       setIV(iv);
     } catch (error) {
       console.error("Encryption failed:", error);
@@ -127,59 +148,78 @@ export default function Home() {
   };
 
   const handleCompareImages = async () => {
-    if (selectedImages.length !== 2) {
-      return alert("Please select exactly two images to compare.");
-    }
-
     setLoading(true);
-
     try {
+      console.log("THis shit");
+      if (typeof uploadedImageUrl !== "string" || !uploadedImageUrl) {
+        throw new Error("uploadedImageUrl must be a valid string");
+      }
+      if (typeof encryptedImageUrl !== "string" || !encryptedImageUrl) {
+        throw new Error("encryptedImageUrl must be a valid string");
+      }
+      if (typeof decryptedImageUrl !== "string" || !decryptedImageUrl) {
+        throw new Error("decryptedImageUrl must be a valid string");
+      }
       // Fetch the selected images as blobs
-      const [originalBlob, encryptedBlob] = await Promise.all(
-        selectedImages.map((imageUrl) =>
-          fetch(imageUrl).then((res) => res.blob()),
-        ),
+      const originalBlob = await fetch(uploadedImageUrl).then((res) =>
+        res.blob(),
       );
-
+      const encryptedBlob = await fetch(encryptedImageUrl).then((res) =>
+        res.blob(),
+      );
+      const decryptedBlob = await fetch(decryptedImageUrl).then((res) =>
+        res.blob(),
+      );
       // Create FormData for both requests
       const formDataCompare = new FormData();
-      formDataCompare.append(
-        "original_image",
-        originalBlob,
-        "original_image.png",
-      );
-      formDataCompare.append(
-        "decrypted_image",
-        encryptedBlob,
-        "decrypted_image.png",
-      );
+      formDataCompare.append("original", originalBlob, "original_image.png");
+      formDataCompare.append("cipher", encryptedBlob, "decrypted_image.png");
 
       const formDataCorr = new FormData();
-      formDataCorr.append("original_image", originalBlob, "original_image.png");
-      formDataCorr.append(
-        "encrypted_image",
-        encryptedBlob,
-        "encrypted_image.png",
-      );
+      formDataCorr.append("original", originalBlob, "original_image.png");
+      formDataCorr.append("cipher", encryptedBlob, "encrypted_image.png");
+
+      const formDataEnt = new FormData();
+      formDataEnt.append("original", originalBlob, "original_image.png");
+      formDataEnt.append("cipher", encryptedBlob, "encrypted_image.png");
+      formDataEnt.append("decrypted", decryptedBlob, "decrypted_image.png");
 
       // Send requests to both endpoints concurrently
-      const [compareResponse, corrResponse, plotResponse1, plotResponse2] =
+      const [compareResponse, corrResponse, entResponse, formulaResponse] =
         await Promise.all([
           axios.post(`${BASE_URL}/compare-images`, formDataCompare, {
             headers: { "Content-Type": "multipart/form-data" },
           }),
-          axios.post(`${BASE_URL}/corr-calc`, formDataCorr, {
+          axios.post(`${BASE_URL}/corr-calc`, formDataEnt, {
+            headers: { "Content-Type": "multipart/form-data" },
+          }),
+          axios.post(`${BASE_URL}/corr-entropy`, formDataEnt, {
+            headers: { "Content-Type": "multipart/form-data" },
+          }),
+          axios.post(`${BASE_URL}/formulas`, formDataCompare, {
             headers: { "Content-Type": "multipart/form-data" },
           }),
         ]);
       console.log(compareResponse.data);
       console.log(corrResponse.data);
+      console.log(entResponse.data);
+      console.log(formulaResponse.data);
 
       // Update state with responses
       setComparisonResult({
         compare: compareResponse.data,
-        correlation: corrResponse.data,
+        correlationci: corrResponse.data.cipher,
+        correlationog: corrResponse.data.original,
+        correlationde: corrResponse.data.decrypted,
+        entropy: entResponse.data,
+        formula: formulaResponse.data,
       });
+      if (comparisonResult)
+        console.log(
+          "Here",
+          comparisonResult.correlationci,
+          comparisonResult.correlationog,
+        );
     } catch (error) {
       console.error("Error during comparison and correlation:", error);
       alert(
@@ -189,27 +229,62 @@ export default function Home() {
       setLoading(false);
     }
   };
-  const handlePlotImage = async () => {
-    if (selectedImages.length !== 2) {
-      return alert("Please select exactly two images to compare.");
-    }
+  const handleMutliStuff = async () => {
+    setMulting(true);
+    try {
+      console.log("THis shit");
+      if (typeof uploadedImageUrl !== "string" || !uploadedImageUrl) {
+        throw new Error("uploadedImageUrl must be a valid string");
+      }
+      const originalBlob = await fetch(uploadedImageUrl).then((res) =>
+        res.blob(),
+      );
+      // Create FormData for both requests
+      const formDataCompare = new FormData();
+      formDataCompare.append("original", originalBlob, "original_image.png");
 
+      // Send requests to both endpoints concurrently
+      const [multiResponse] = await Promise.all([
+        axios.post(`${BASE_URL}/multimage-corr`, formDataCompare, {
+          headers: { "Content-Type": "multipart/form-data" },
+        }),
+      ]);
+      console.log(multiResponse);
+      // Update state with responses
+      setMultiResult({
+        multi: multiResponse.data,
+      });
+    } catch (error) {
+      console.error("Error during comparison and correlation:", error);
+      alert(
+        "An error occurred during image comparison or correlation. Check console for details.",
+      );
+    } finally {
+      setMulting(false);
+    }
+  };
+
+  const handlePlotImage = async () => {
     setPloting(true);
 
     try {
+      if (typeof uploadedImageUrl !== "string" || !uploadedImageUrl) {
+        throw new Error("uploadedImageUrl must be a valid string");
+      }
+      if (typeof encryptedImageUrl !== "string" || !encryptedImageUrl) {
+        throw new Error("encryptedImageUrl must be a valid string");
+      }
+      const originalBlob = await fetch(uploadedImageUrl).then((res) =>
+        res.blob(),
+      );
+      const encryptedBlob = await fetch(encryptedImageUrl).then((res) =>
+        res.blob(),
+      );
+
       // Fetch the selected images as blobs
-      const [originalBlob, encryptedBlob] = await Promise.all(
-        selectedImages.map((imageUrl) =>
-          fetch(imageUrl).then((res) => res.blob()),
-        ),
-      );
       const formDataPlot = new FormData();
-      formDataPlot.append("original_image", originalBlob, "original_image.png");
-      formDataPlot.append(
-        "encrypted_image",
-        encryptedBlob,
-        "encrypted_image.png",
-      );
+      formDataPlot.append("original", originalBlob, "original_image.png");
+      formDataPlot.append("cipher", encryptedBlob, "encrypted_image.png");
       const [plotResponse1, plotResponse2] = await Promise.all([
         axios.post(`${BASE_URL}/plot`, formDataPlot, {
           headers: { "Content-Type": "multipart/form-data" },
@@ -246,20 +321,17 @@ export default function Home() {
 
   // Handle removing all images
   const handleRemoveAll = () => {
-    setImage(null);
-    setUploadedImageUrl(null);
-    setEncryptedImageUrl(null);
-    setDecryptedImageUrl(null);
-    setDecryptedImageSize(null);
     setComparisonResult(null);
-    setEncryptionKey(null);
+    setPlotResult(null);
     setIV(null);
   };
 
   return (
     <main className="w-full flex flex-col justify-center items-center pt-5">
       {/* Upload Image */}
-      {!image && !encryptedImageUrl && (
+      {image || encryptedImageUrl ? (
+        <p></p>
+      ) : encryptionKey ? (
         <section className="flex flex-col w-full">
           <label
             htmlFor="imageUpload"
@@ -275,17 +347,15 @@ export default function Home() {
             className="hidden"
           />
         </section>
+      ) : (
+        <p>Setting Up your Key ...</p>
       )}
 
       <section className="flex flex-row gap-6 mt-4">
         {uploadedImageUrl && (
           <section
             onClick={() => handleImageSelection(uploadedImageUrl)}
-            className={`flex flex-col items-center cursor-pointer ${
-              selectedImages.includes(uploadedImageUrl)
-                ? "border-4 p-2 border-blue-500"
-                : ""
-            }`}
+            className={`flex flex-col items-center cursor-pointer`}
           >
             <h3 className="text-lg font-semibold">Uploaded Image</h3>
             <img
@@ -299,11 +369,7 @@ export default function Home() {
         {encryptedImageUrl && (
           <section
             onClick={() => handleImageSelection(encryptedImageUrl)}
-            className={`flex flex-col items-center cursor-pointer ${
-              selectedImages.includes(encryptedImageUrl)
-                ? "border-4 p-2 border-blue-500"
-                : ""
-            }`}
+            className={`flex flex-col items-center cursor-pointer`}
           >
             <h3 className="text-lg font-semibold">Encrypted Image</h3>
             <img
@@ -321,11 +387,7 @@ export default function Home() {
         {decryptedImageUrl && (
           <section
             onClick={() => handleImageSelection(decryptedImageUrl)}
-            className={`flex flex-col items-center cursor-pointer ${
-              selectedImages.includes(decryptedImageUrl)
-                ? "border-4 p-2 border-blue-500"
-                : ""
-            }`}
+            className={`flex flex-col items-center cursor-pointer`}
           >
             <h3 className="text-lg font-semibold">Decrypted Image</h3>
             <img
@@ -336,42 +398,230 @@ export default function Home() {
           </section>
         )}
       </section>
-      <section className="flex flex-row justify-center w-full flex-wrap">
+      <section className="flex flex-col justify-center w-full">
         {comparisonResult?.compare && (
           <section className="mt-6 p-4 bg-gray-100 rounded">
             <h3 className="text-lg font-semibold">Comparison Result</h3>
             <ul className="text-sm">
               {Object.entries(comparisonResult.compare).map(([key, value]) => (
                 <li key={key}>
-                  <strong>{key}:</strong> {value}
+                  {key != "mismatch" ? (
+                    <>
+                      {" "}
+                      <strong>{key}:</strong> {value}
+                    </>
+                  ) : (
+                    <p></p>
+                  )}
                 </li>
               ))}
             </ul>
           </section>
         )}
-
-        {comparisonResult?.correlation && (
-          <section className="mt-6 p-4 rounded">
-            <h3 className="text-lg font-semibold">Correlation Result</h3>
-            <table className="text-sm table-auto w-full">
+        {comparisonResult && (
+          <section className=" flex flex-col w-full items-center justify-center my-5">
+            <table className="table-auto border-collapse border border-slate-400 text-center mt-1">
+              <thead>
+                <tr>
+                  <th className="border border-slate-400 p-2"> Image </th>
+                  <th className="border border-slate-400 p-2">
+                    {" "}
+                    Diagonal Correlation{" "}
+                  </th>
+                  <th className="border border-slate-400 p-2">
+                    {" "}
+                    Horizontal Correlation{" "}
+                  </th>
+                  <th className="border border-slate-400 p-2">
+                    {" "}
+                    Vertical Correlation{" "}
+                  </th>
+                  <th className="border border-slate-400 p-2"> Entropy </th>
+                  <th className="border border-slate-400 p-2">
+                    {" "}
+                    Correlation Coefficent <br />
+                    <span className="text-xs">Original vs Cipher</span>{" "}
+                  </th>
+                  <th className="border border-slate-400 p-2">
+                    {" "}
+                    Correlation Coefficent <br />
+                    <span className="text-xs">Original vs Decrypted</span>{" "}
+                  </th>
+                  <th className="border border-slate-400 p-2">
+                    {" "}
+                    Correlation Coefficent <br />
+                    <span className="text-xs">Cipher vs Decrypted</span>{" "}
+                  </th>
+                </tr>
+              </thead>
               <tbody>
-                {Object.entries(comparisonResult.correlation).map(
-                  ([key, value]) => (
-                    <tr key={key} className="border-2 border-gray-300">
-                      <th className="text-left bg-gray-100 py-1 px-2 border-r-gray-300 border-r-2">
-                        {key}:
-                      </th>
-                      <td className="px-2">{value}</td>
-                    </tr>
-                  ),
-                )}
+                <tr>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    Original Image{" "}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.correlationog.dcorr}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.correlationog.hcorr}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.correlationog.vcorr}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.entropy.e_plain}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.entropy.cc_plainvcipher}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.entropy.cc_plainvsdecrypt}
+                  </td>
+                  <td className="border border-slate-400 p-2">-</td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    Encrypted Image{" "}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.correlationci.dcorr}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.correlationci.hcorr}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.correlationci.vcorr}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.entropy.e_cipher}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.entropy.cc_plainvcipher}
+                  </td>
+                  <td className="border border-slate-400 p-2">-</td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.entropy.cc_ciphervsdecrypt}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    Decrypted Image{" "}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.correlationde.dcorr}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.correlationde.hcorr}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.correlationde.vcorr}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.entropy.e_decrypted}
+                  </td>
+                  <td className="border border-slate-400 p-2">-</td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.entropy.cc_plainvsdecrypt}
+                  </td>
+                  <td className="border border-slate-400 p-2">
+                    {" "}
+                    {comparisonResult.entropy.cc_ciphervsdecrypt}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </section>
         )}
+        {multiResult?.multi && (
+          <section className="mt-6 p-4 bg-gray-100 rounded">
+            <h3 className="text-lg font-semibold">
+              Multi-Image Analysis Results
+            </h3>
+
+            {/* Cipher Details Table */}
+            {multiResult.multi?.cipher_details && (
+              <div className="mt-4">
+                <h4 className="text-md font-semibold">Cipher Details</h4>
+                <table className="table-auto border-collapse border border-gray-300 w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="border border-gray-300 px-4 py-2">Pair</th>
+                      <th className="border border-gray-300 px-4 py-2">
+                        Correlation
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {multiResult.multi.cipher_details.map(
+                      ({ pair, correlation }) => (
+                        <tr key={pair}>
+                          <td className="border border-gray-300 px-4 py-2">
+                            {pair}
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            {correlation}
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Key Details Table */}
+            {multiResult.multi?.key_details && (
+              <div className="mt-6">
+                <h4 className="text-md font-semibold">Key Details</h4>
+                <table className="table-auto border-collapse border border-gray-300 w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="border border-gray-300 px-4 py-2">
+                        File Name
+                      </th>
+                      <th className="border border-gray-300 px-4 py-2">Key</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {multiResult.multi.key_details.map(({ file_name, key }) => (
+                      <tr key={file_name}>
+                        <td className="border border-gray-300 px-4 py-2">
+                          {file_name}
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          {key}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
 
         {plotresult?.plot1 && (
-          <section className="mt-6 p-4 bg-gray-100 rounded">
+          <section className="p-4 bg-gray-100 rounded">
             <h3 className="text-lg font-semibold">Generated Plot</h3>
             <img
               src={plotresult.plot1}
@@ -391,6 +641,101 @@ export default function Home() {
           </section>
         )}
       </section>
+      <section className="flex flex-row items-center justify-center">
+        {comparisonResult?.correlationog && comparisonResult?.correlationci && (
+          <section className="mt-6 p-4 rounded">
+            <h3 className="text-lg font-semibold">
+              Correlation Result Original
+            </h3>
+            <table className="text-sm table-auto w-full mt-1">
+              <tbody>
+                {Object.entries(comparisonResult.correlationog).map(
+                  ([key, value]) => (
+                    <tr key={key} className="border-2 border-gray-300">
+                      <th className="text-left bg-gray-100 py-1 px-2 border-r-gray-300 border-r-2">
+                        {key}:
+                      </th>
+                      <td className="px-2">{value}</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+            <h3 className="text-lg font-semibold mt-2">
+              Correlation Result Cipher
+            </h3>
+            <table className="text-sm table-auto w-full mt-1">
+              <tbody>
+                {Object.entries(comparisonResult.correlationci).map(
+                  ([key, value]) => (
+                    <tr key={key} className="border-2 border-gray-300">
+                      <th className="text-left bg-gray-100 py-1 px-2 border-r-gray-300 border-r-2">
+                        {key}:
+                      </th>
+                      <td className="px-2">{value}</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+            <h3 className="text-lg font-semibold mt-2">
+              Correlation Result Decrypted
+            </h3>
+            <table className="text-sm table-auto w-full mt-1">
+              <tbody>
+                {Object.entries(comparisonResult.correlationde).map(
+                  ([key, value]) => (
+                    <tr key={key} className="border-2 border-gray-300">
+                      <th className="text-left bg-gray-100 py-1 px-2 border-r-gray-300 border-r-2">
+                        {key}:
+                      </th>
+                      <td className="px-2">{value}</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </section>
+        )}
+        {comparisonResult?.entropy && (
+          <section className="mt-6 p-4 rounded">
+            <h3 className="text-lg font-semibold">Entropy</h3>
+            <table className="text-sm table-auto w-full">
+              <tbody>
+                {Object.entries(comparisonResult.entropy).map(
+                  ([key, value]) => (
+                    <tr key={key} className="border-2 border-gray-300">
+                      <th className="text-left bg-gray-100 py-1 px-2 border-r-gray-300 border-r-2">
+                        {key}:
+                      </th>
+                      <td className="px-2">{value}</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </section>
+        )}
+        {comparisonResult?.formula && (
+          <section className="mt-6 p-4 rounded">
+            <h3 className="text-lg font-semibold">Formula</h3>
+            <table className="text-sm table-auto w-full">
+              <tbody>
+                {Object.entries(comparisonResult.formula).map(
+                  ([key, value]) => (
+                    <tr key={key} className="border-2 border-gray-300">
+                      <th className="text-left bg-gray-100 py-1 px-2 border-r-gray-300 border-r-2">
+                        {key}:
+                      </th>
+                      <td className="px-2">{parseFloat(value).toFixed(2)}</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </section>
+        )}
+      </section>
 
       <section className="flex flex-row items-center justify-center w-full">
         {image && !encryptedImageUrl && (
@@ -407,7 +752,6 @@ export default function Home() {
           <button
             onClick={handleCompareImages}
             className="bg-purple-500 hover:bg-purple-600 text-white rounded w-48 h-10 mt-10 mr-10"
-            disabled={selectedImages.length !== 2 || loading}
           >
             {loading ? "Comparing..." : "Compare Images"}
           </button>
@@ -416,19 +760,16 @@ export default function Home() {
           <button
             onClick={handlePlotImage}
             className="bg-purple-500 hover:bg-purple-600 text-white rounded w-48 h-10 mt-10 mr-10"
-            disabled={selectedImages.length !== 2 || ploting}
           >
-            {loading ? "Ploting..." : "Plot"}
+            {ploting ? "Ploting..." : "Plot"}
           </button>
         )}
-
         {image && encryptedImageUrl && decryptedImageUrl && (
           <button
-            onClick={handleRemoveSelection}
+            onClick={handleMutliStuff}
             className="bg-purple-500 hover:bg-purple-600 text-white rounded w-48 h-10 mt-10 mr-10"
-            disabled={selectedImages.length !== 2 || loading}
           >
-            Remove Selection
+            {multing ? "Waiting..." : "Multi"}
           </button>
         )}
 
