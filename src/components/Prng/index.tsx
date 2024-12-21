@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { abortOnSynchronousPlatformIOAccess } from "next/dist/server/app-render/dynamic-rendering";
+import ImagePreviewSection from "../ImageRow";
 
 type ImageFile = File | null;
 
