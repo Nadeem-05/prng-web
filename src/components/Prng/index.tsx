@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
+import ImagePreviewSection from "../ImageRow";
 
 type ImageFile = File | null;
 
@@ -175,36 +176,48 @@ export default function Home() {
       formDataCompare.append("original", originalBlob, "original_image.png");
       formDataCompare.append("cipher", encryptedBlob, "decrypted_image.png");
 
-      const formDataCorr = new FormData();
-      formDataCorr.append("original", originalBlob, "original_image.png");
-      formDataCorr.append("cipher", encryptedBlob, "encrypted_image.png");
-
       const formDataEnt = new FormData();
       formDataEnt.append("original", originalBlob, "original_image.png");
       formDataEnt.append("cipher", encryptedBlob, "encrypted_image.png");
       formDataEnt.append("decrypted", decryptedBlob, "decrypted_image.png");
+      const formLossEnt = new FormData();
+      formLossEnt.append("original", originalBlob, "original_image.png");
+      formLossEnt.append("decrypted", decryptedBlob, "decrypted_image.png");
 
       // Send requests to both endpoints concurrently
-      const [compareResponse, corrResponse, entResponse, formulaResponse] =
-        await Promise.all([
-          axios.post(`${BASE_URL}/compare-images`, formDataCompare, {
-            headers: { "Content-Type": "multipart/form-data" },
-          }),
-          axios.post(`${BASE_URL}/corr-calc`, formDataEnt, {
-            headers: { "Content-Type": "multipart/form-data" },
-          }),
-          axios.post(`${BASE_URL}/corr-entropy`, formDataEnt, {
-            headers: { "Content-Type": "multipart/form-data" },
-          }),
-          axios.post(`${BASE_URL}/formulas`, formDataCompare, {
-            headers: { "Content-Type": "multipart/form-data" },
-          }),
-        ]);
+      const [
+        compareResponse,
+        corrResponse,
+        entResponse,
+        formulaResponse,
+        histResponse,
+        dataResponse,
+      ] = await Promise.all([
+        axios.post(`${BASE_URL}/compare-images`, formDataCompare, {
+          headers: { "Content-Type": "multipart/form-data" },
+        }),
+        axios.post(`${BASE_URL}/corr-calc`, formDataEnt, {
+          headers: { "Content-Type": "multipart/form-data" },
+        }),
+        axios.post(`${BASE_URL}/corr-entropy`, formDataEnt, {
+          headers: { "Content-Type": "multipart/form-data" },
+        }),
+        axios.post(`${BASE_URL}/formulas`, formDataCompare, {
+          headers: { "Content-Type": "multipart/form-data" },
+        }),
+        axios.post(`${BASE_URL}/calculate_variance`, formDataCompare, {
+          headers: { "Content-Type": "multipart/form-data" },
+        }),
+        axios.post(`${BASE_URL}/data_loss`, formLossEnt, {
+          headers: { "Content-Type": "multipart/form-data" },
+        }),
+      ]);
       console.log(compareResponse.data);
       console.log(corrResponse.data);
       console.log(entResponse.data);
       console.log(formulaResponse.data);
-
+      console.log(histResponse.data);
+      console.log(dataResponse.data);
       // Update state with responses
       setComparisonResult({
         compare: compareResponse.data,
@@ -213,6 +226,7 @@ export default function Home() {
         correlationde: corrResponse.data.decrypted,
         entropy: entResponse.data,
         formula: formulaResponse.data,
+        hist: histResponse.data,
       });
       if (comparisonResult)
         console.log(
@@ -323,6 +337,7 @@ export default function Home() {
   const handleRemoveAll = () => {
     setComparisonResult(null);
     setPlotResult(null);
+    setMultiResult(null);
     setIV(null);
   };
 
@@ -351,53 +366,12 @@ export default function Home() {
         <p>Setting Up your Key ...</p>
       )}
 
-      <section className="flex flex-row gap-6 mt-4">
-        {uploadedImageUrl && (
-          <section
-            onClick={() => handleImageSelection(uploadedImageUrl)}
-            className={`flex flex-col items-center cursor-pointer`}
-          >
-            <h3 className="text-lg font-semibold">Uploaded Image</h3>
-            <img
-              src={uploadedImageUrl}
-              alt="Uploaded Preview"
-              className="w-80 h-80 object-contain mb-2"
-            />
-          </section>
-        )}
-
-        {encryptedImageUrl && (
-          <section
-            onClick={() => handleImageSelection(encryptedImageUrl)}
-            className={`flex flex-col items-center cursor-pointer`}
-          >
-            <h3 className="text-lg font-semibold">Encrypted Image</h3>
-            <img
-              src={encryptedImageUrl}
-              alt="Encrypted Preview"
-              className="w-80 h-80 object-contain mb-2"
-            />
-            <p className="bg-black hover:bg-white">
-              {" "}
-              Encryption Key : {encryptionKey}
-            </p>
-          </section>
-        )}
-
-        {decryptedImageUrl && (
-          <section
-            onClick={() => handleImageSelection(decryptedImageUrl)}
-            className={`flex flex-col items-center cursor-pointer`}
-          >
-            <h3 className="text-lg font-semibold">Decrypted Image</h3>
-            <img
-              src={decryptedImageUrl}
-              alt="Decrypted Preview"
-              className="w-80 h-80 object-contain mb-2"
-            />
-          </section>
-        )}
-      </section>
+      <ImagePreviewSection
+        uploadedImageUrl={uploadedImageUrl}
+        encryptedImageUrl={encryptedImageUrl}
+        decryptedImageUrl={decryptedImageUrl}
+        encryptionKey={encryptionKey}
+      />
       <section className="flex flex-col justify-center w-full">
         {comparisonResult?.compare && (
           <section className="mt-6 p-4 bg-gray-100 rounded">
@@ -419,132 +393,120 @@ export default function Home() {
           </section>
         )}
         {comparisonResult && (
-          <section className=" flex flex-col w-full items-center justify-center my-5">
+          <section className="flex flex-col w-full items-center justify-center my-5">
             <table className="table-auto border-collapse border border-slate-400 text-center mt-1">
               <thead>
                 <tr>
-                  <th className="border border-slate-400 p-2"> Image </th>
+                  <th className="border border-slate-400 p-2">Image</th>
                   <th className="border border-slate-400 p-2">
-                    {" "}
-                    Diagonal Correlation{" "}
+                    Diagonal Correlation
                   </th>
                   <th className="border border-slate-400 p-2">
-                    {" "}
-                    Horizontal Correlation{" "}
+                    Horizontal Correlation
                   </th>
                   <th className="border border-slate-400 p-2">
-                    {" "}
-                    Vertical Correlation{" "}
+                    Vertical Correlation
                   </th>
-                  <th className="border border-slate-400 p-2"> Entropy </th>
+                  <th className="border border-slate-400 p-2">Histogram</th>
+                  <th className="border border-slate-400 p-2">Entropy</th>
                   <th className="border border-slate-400 p-2">
-                    {" "}
-                    Correlation Coefficent <br />
-                    <span className="text-xs">Original vs Cipher</span>{" "}
-                  </th>
-                  <th className="border border-slate-400 p-2">
-                    {" "}
-                    Correlation Coefficent <br />
-                    <span className="text-xs">Original vs Decrypted</span>{" "}
+                    Correlation Coefficient
+                    <br />
+                    <span className="text-xs">Original vs Cipher</span>
                   </th>
                   <th className="border border-slate-400 p-2">
-                    {" "}
-                    Correlation Coefficent <br />
-                    <span className="text-xs">Cipher vs Decrypted</span>{" "}
+                    Correlation Coefficient
+                    <br />
+                    <span className="text-xs">Original vs Decrypted</span>
+                  </th>
+                  <th className="border border-slate-400 p-2">
+                    Correlation Coefficient
+                    <br />
+                    <span className="text-xs">Cipher vs Decrypted</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td className="border border-slate-400 p-2">
-                    {" "}
-                    Original Image{" "}
+                    Original Image
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.correlationog.dcorr}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.correlationog.hcorr}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.correlationog.vcorr}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
+                    {comparisonResult.hist.histogram_original}
+                  </td>
+                  <td className="border border-slate-400 p-2">
                     {comparisonResult.entropy.e_plain}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.entropy.cc_plainvcipher}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.entropy.cc_plainvsdecrypt}
                   </td>
                   <td className="border border-slate-400 p-2">-</td>
                 </tr>
                 <tr>
                   <td className="border border-slate-400 p-2">
-                    {" "}
-                    Encrypted Image{" "}
+                    Encrypted Image
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.correlationci.dcorr}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.correlationci.hcorr}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.correlationci.vcorr}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
+                    <div>{comparisonResult.hist.histogram_cipher}</div>
+                    <div className="text-xs text-gray-500">
+                      Variance Reduction:{" "}
+                      {comparisonResult.hist.variance_reduction}
+                    </div>
+                  </td>
+                  <td className="border border-slate-400 p-2">
                     {comparisonResult.entropy.e_cipher}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.entropy.cc_plainvcipher}
                   </td>
                   <td className="border border-slate-400 p-2">-</td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.entropy.cc_ciphervsdecrypt}
                   </td>
                 </tr>
                 <tr>
                   <td className="border border-slate-400 p-2">
-                    {" "}
-                    Decrypted Image{" "}
+                    Decrypted Image
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.correlationde.dcorr}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.correlationde.hcorr}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.correlationde.vcorr}
                   </td>
+                  <td className="border border-slate-400 p-2"> </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.entropy.e_decrypted}
                   </td>
                   <td className="border border-slate-400 p-2">-</td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.entropy.cc_plainvsdecrypt}
                   </td>
                   <td className="border border-slate-400 p-2">
-                    {" "}
                     {comparisonResult.entropy.cc_ciphervsdecrypt}
                   </td>
                 </tr>
