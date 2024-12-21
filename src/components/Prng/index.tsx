@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
-import ImagePreviewSection from "../ImageRow";
+import { abortOnSynchronousPlatformIOAccess } from "next/dist/server/app-render/dynamic-rendering";
 
 type ImageFile = File | null;
 
@@ -15,9 +15,16 @@ export default function Home() {
   const [decryptedImageUrl, setDecryptedImageUrl] = useState<string | null>(
     null,
   );
+  const [ImageWidth, setImageWidth] = useState<number | null>(
+    null,
+  );
+  const [ImageHeight, setHeight] = useState<number | null>(
+    null,
+  );
   const [decryptedImageSize, setDecryptedImageSize] = useState<number | null>(
     null,
   );
+  const [byteSize, setByteSize] = useState<number | null>(null);
   const [encryptionKey, setEncryptionKey] = useState<string | null>(null);
   const [ivector, setIV] = useState<string | null>(null);
   const [comparisonResult, setComparisonResult] = useState<Record<
@@ -90,6 +97,15 @@ export default function Home() {
 
       const iv = response.headers["x-iv"];
       if (!iv) throw new Error("No iv");
+      const Width = response.headers["x-width"];
+      const Height = response.headers["x-height"];
+      const byteSize = response.headers["x-datalength"];
+      if (!Width) throw new Error("No Width");
+      if (!Height) throw new Error("No Height");
+      if (!byteSize) throw new Error("No byteSize");
+      setImageWidth(parseInt(Width));
+      setHeight(parseInt(Height));
+      setByteSize(parseInt(byteSize));
 
       const encryptedUrl = URL.createObjectURL(response.data);
       setEncryptedImageUrl(encryptedUrl);
@@ -119,7 +135,11 @@ export default function Home() {
       formData.append("iv", ivector);
 
       const response = await axios.post(`${BASE_URL}/decrypt-image`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { "Content-Type": "multipart/form-data" ,
+                    "X-Width" : ImageWidth,
+                    "X-Height" : ImageHeight,
+                    "X-Datalength" : byteSize
+        },
         responseType: "blob", // Expect binary data as response
       });
 
