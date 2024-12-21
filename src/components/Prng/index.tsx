@@ -41,8 +41,7 @@ export default function Home() {
   const [ploting, setPloting] = useState(false);
   const [multing, setMulting] = useState(false);
 
-  const BASE_URL = "http://127.0.0.1:5000"; // Replace with your API base URL
-
+  const BASE_URL = "http://127.0.0.1:5000"; 
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   useEffect(() => {
     // Define the asynchronous function inside useEffect
@@ -359,6 +358,9 @@ export default function Home() {
     setPlotResult(null);
     setMultiResult(null);
     setIV(null);
+    setByteSize(null);
+    setHeight(null);
+    setImageWidth(null);
   };
 
   return (
