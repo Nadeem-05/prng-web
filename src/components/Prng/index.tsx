@@ -77,7 +77,6 @@ export default function Home() {
     }
   };
 
-  // Handle image encryption
   const handleEncryptImage = async () => {
     if (!image) return alert("Please upload an image first.");
 
@@ -180,6 +179,9 @@ export default function Home() {
       if (typeof decryptedImageUrl !== "string" || !decryptedImageUrl) {
         throw new Error("decryptedImageUrl must be a valid string");
       }
+      if (!ivector || !encryptionKey){
+        throw new Error("Missing IV");
+      }
       // Fetch the selected images as blobs
       const originalBlob = await fetch(uploadedImageUrl).then((res) =>
         res.blob(),
@@ -190,11 +192,11 @@ export default function Home() {
       const decryptedBlob = await fetch(decryptedImageUrl).then((res) =>
         res.blob(),
       );
-      // Create FormData for both requests
       const formDataCompare = new FormData();
       formDataCompare.append("original", originalBlob, "original_image.png");
       formDataCompare.append("cipher", encryptedBlob, "decrypted_image.png");
-
+      formDataCompare.append("iv",ivector);
+      formDataCompare.append("key",encryptionKey)
       const formDataEnt = new FormData();
       formDataEnt.append("original", originalBlob, "original_image.png");
       formDataEnt.append("cipher", encryptedBlob, "encrypted_image.png");
