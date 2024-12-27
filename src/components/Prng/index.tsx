@@ -15,12 +15,8 @@ export default function Home() {
   const [decryptedImageUrl, setDecryptedImageUrl] = useState<string | null>(
     null,
   );
-  const [ImageWidth, setImageWidth] = useState<number | null>(
-    null,
-  );
-  const [ImageHeight, setHeight] = useState<number | null>(
-    null,
-  );
+  const [ImageWidth, setImageWidth] = useState<number | null>(null);
+  const [ImageHeight, setHeight] = useState<number | null>(null);
   const [decryptedImageSize, setDecryptedImageSize] = useState<number | null>(
     null,
   );
@@ -41,7 +37,7 @@ export default function Home() {
   const [ploting, setPloting] = useState(false);
   const [multing, setMulting] = useState(false);
 
-  const BASE_URL = "http://127.0.0.1:5000"; 
+  const BASE_URL = "http://127.0.0.1:5000";
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   useEffect(() => {
     // Define the asynchronous function inside useEffect
@@ -133,10 +129,11 @@ export default function Home() {
       formData.append("iv", ivector);
 
       const response = await axios.post(`${BASE_URL}/decrypt-image`, formData, {
-        headers: { "Content-Type": "multipart/form-data" ,
-                    "X-Width" : ImageWidth,
-                    "X-Height" : ImageHeight,
-                    "X-Datalength" : byteSize
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Width": ImageWidth,
+          "X-Height": ImageHeight,
+          "X-Datalength": byteSize,
         },
         responseType: "blob", // Expect binary data as response
       });
@@ -155,17 +152,6 @@ export default function Home() {
     }
   };
 
-  const handleImageSelection = (imageUrl: string) => {
-    // Toggle image selection
-    if (selectedImages.includes(imageUrl)) {
-      setSelectedImages(selectedImages.filter((img) => img !== imageUrl));
-    } else if (selectedImages.length < 2) {
-      setSelectedImages([...selectedImages, imageUrl]);
-    } else {
-      alert("You can only select up to 2 images for comparison.");
-    }
-  };
-
   const handleCompareImages = async () => {
     setLoading(true);
     try {
@@ -179,7 +165,7 @@ export default function Home() {
       if (typeof decryptedImageUrl !== "string" || !decryptedImageUrl) {
         throw new Error("decryptedImageUrl must be a valid string");
       }
-      if (!ivector || !encryptionKey){
+      if (!ivector || !encryptionKey) {
         throw new Error("Missing IV");
       }
       // Fetch the selected images as blobs
@@ -195,8 +181,8 @@ export default function Home() {
       const formDataCompare = new FormData();
       formDataCompare.append("original", originalBlob, "original_image.png");
       formDataCompare.append("cipher", encryptedBlob, "decrypted_image.png");
-      formDataCompare.append("iv",ivector);
-      formDataCompare.append("key",encryptionKey)
+      formDataCompare.append("iv", ivector);
+      formDataCompare.append("key", encryptionKey);
       const formDataEnt = new FormData();
       formDataEnt.append("original", originalBlob, "original_image.png");
       formDataEnt.append("cipher", encryptedBlob, "encrypted_image.png");
