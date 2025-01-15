@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import ImagePreviewSection from "./ImageRow";
-
+import PrintButton from "./printbutton";
 type ImageFile = File | null;
 
 export default function AES() {
@@ -599,7 +599,7 @@ export default function AES() {
         )}
 
         {plotresult?.plot1 && (
-          <section className="p-4 bg-gray-100 rounded">
+          <section className="p-4 bg-gray-100 rounded mt-10">
             <h3 className="text-lg font-semibold">Generated Plot</h3>
             <img
               src={plotresult.plot1}
@@ -762,12 +762,20 @@ export default function AES() {
         )}
 
         {(image || encryptedImageUrl || decryptedImageUrl) && (
-          <button
-            onClick={handleRemoveAll}
-            className="bg-red-500 hover:bg-red-600 text-white rounded w-48 h-10 mt-10"
-          >
-            Remove All
-          </button>
+          <section className="flex flex-row items-center justify-center">
+            <button
+              onClick={handleRemoveAll}
+              className="bg-red-500 hover:bg-red-600 text-white rounded w-48 h-10 mt-10"
+            >
+              Remove All
+            </button>
+            <PrintButton
+              label="Print Document"
+              onBeforePrint={() => {}}
+              onAfterPrint={() => {}}
+              className=""
+            />
+          </section>
         )}
       </section>
     </main>

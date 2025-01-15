@@ -32,14 +32,14 @@ const ImagePreviewSection: React.FC<ImagePreviewSectionProps> = ({
   };
 
   return (
-    <section className="flex flex-row  flex-wrap w-full justify-center mt-4">
+    <section className="flex flex-row  flex-wrap w-full justify-between text-center mt-4">
       {uploadedImageUrl && (
         <section className="flex flex-col items-center cursor-pointer">
           <h3 className="text-lg font-semibold">Uploaded Image</h3>
           <img
             src={uploadedImageUrl}
             alt="Uploaded Preview"
-            className="object-contain mb-2"
+            className="object-contain mb-2 w-[300px] h-[300px]"
             onLoad={(e) => handleImageLoad(e, setUploadedImageSize)}
           />
           {uploadedImageSize && (
@@ -54,15 +54,12 @@ const ImagePreviewSection: React.FC<ImagePreviewSectionProps> = ({
           <img
             src={encryptedImageUrl}
             alt="Encrypted Preview"
-            className="object-contain mb-2"
+            className="object-contain mb-2 w-[300px] h-[300px]"
             onLoad={(e) => handleImageLoad(e, setEncryptedImageSize)}
           />
           {encryptedImageSize && (
             <p className="text-sm text-gray-500">Size: {encryptedImageSize}</p>
           )}
-          <p className="bg-black hover:bg-white text-black px-2 py-1 mt-2">
-            Encryption Key: {encryptionKey}
-          </p>
         </section>
       )}
 
@@ -72,7 +69,7 @@ const ImagePreviewSection: React.FC<ImagePreviewSectionProps> = ({
           <img
             src={decryptedImageUrl}
             alt="Decrypted Preview"
-            className="object-contain mb-2"
+            className="object-contain mb-2 w-[300px] h-[300px]"
             onLoad={(e) => handleImageLoad(e, setDecryptedImageSize)}
           />
           {decryptedImageSize && (
@@ -80,6 +77,9 @@ const ImagePreviewSection: React.FC<ImagePreviewSectionProps> = ({
           )}
         </section>
       )}
+      <p className="text-black px-2 py-1 mt-2 text-center">
+        Encryption Key: {encryptionKey}
+      </p>
     </section>
   );
 };
