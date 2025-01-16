@@ -312,8 +312,12 @@ export default function AES() {
       const formDataPlot = new FormData();
       formDataPlot.append("original", originalBlob, "original_image.png");
       formDataPlot.append("cipher", encryptedBlob, "encrypted_image.png");
-      const [plotResponse1, plotResponse2] = await Promise.all([
-        axios.post(`${BASE_URL}/plot`, formDataPlot, {
+      const [plotResponse11,plotResponse12, plotResponse2] = await Promise.all([
+        axios.post(`${BASE_URL}/plot/original`, formDataPlot, {
+          headers: { "Content-Type": "multipart/form-data" },
+          responseType: "blob",
+        }),
+        axios.post(`${BASE_URL}/plot/encrypted`, formDataPlot, {
           headers: { "Content-Type": "multipart/form-data" },
           responseType: "blob",
         }),
@@ -322,12 +326,16 @@ export default function AES() {
           responseType: "blob",
         }),
       ]);
-      console.log(plotResponse1.data);
+      console.log(plotResponse11.data);
+      console.log(plotResponse12.data);
       console.log(plotResponse2.data);
-      const plotUrl1 = URL.createObjectURL(plotResponse1.data);
+      const plotUrl11 = URL.createObjectURL(plotResponse11.data);
+      const plotUrl12 = URL.createObjectURL(plotResponse12.data);
       const plotUrl2 = URL.createObjectURL(plotResponse2.data);
+      console.log(plotUrl11,plotUrl12)
       setPlotResult({
-        plot1: plotUrl1,
+        plot11: plotUrl11,
+        plot12 : plotUrl12,
         plot2: plotUrl2,
       });
     } catch (error) {
@@ -598,26 +606,44 @@ export default function AES() {
           </section>
         )}
 
-        {plotresult?.plot1 && (
-          <section className="p-4 bg-gray-100 rounded mt-10">
-            <h3 className="text-lg font-semibold">Generated Plot</h3>
-            <img
-              src={plotresult.plot1}
-              alt="Generated Plot"
-              className="w-full h-auto"
-            />
-          </section>
-        )}
-        {plotresult?.plot2 && (
-          <section className="mt-6 p-4 bg-gray-100 rounded">
-            <h3 className="text-lg font-semibold">Generated Plot</h3>
-            <img
-              src={plotresult.plot2}
-              alt="Generated Plot"
-              className="w-full h-auto"
-            />
-          </section>
-        )}
+{plotresult?.plot11 && (
+  <section className="p-4 bg-gray-100 rounded mt-10 flex items-center justify-center space-x-5">
+    <img
+      src={uploadedImageUrl}
+      alt="Encrypted Image Plot"
+      className="w-96 h-96"
+    />    
+    <img
+      src={plotresult.plot11}
+      alt="Encrypted Image Plot"
+      className="w-96 h-96"
+    />
+  </section>
+)}
+{plotresult?.plot11 && (
+  <section className="mt-10 p-4 bg-gray-100 rounded flex items-center justify-center space-x-5">
+      <img
+      src={encryptedImageUrl}
+      alt="Encrypted Image Plot"
+      className="w-96 h-96"
+    />   
+    <img
+      src={plotresult.plot12}
+      alt="Encrypted Image Plot"
+      className="w-96 h-96"
+    />
+  </section>
+)}
+{plotresult?.plot2 && (
+  <section className="mt-6 p-4 bg-gray-100 rounded">
+    <h3 className="text-lg font-semibold">Comparison Plot</h3>
+    <img
+      src={plotresult.plot2}
+      alt="Comparison Plot"
+      className="max-w-full h-auto"
+    />
+  </section>
+)}
       </section>
       <section className="flex flex-row items-center justify-center">
         {comparisonResult?.correlationog && comparisonResult?.correlationci && (

@@ -33,7 +33,7 @@ export default function Home() {
         >
           <option value="">Select Encryption Type</option>
           <option value="AES">AES</option>
-          <option value="RSAES">AES with RSA Key Encryption</option>
+          {/* <option value="RSAES">AES with RSA Key Encryption</option> */}
         </select>
       </section>
 
