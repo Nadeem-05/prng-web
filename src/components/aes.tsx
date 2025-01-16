@@ -1,9 +1,9 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import axios from "axios";
 import ImagePreviewSection from "./ImageRow";
 import PrintButton from "./printbutton";
+
 type ImageFile = File | null;
 
 export default function AES() {
@@ -41,7 +41,7 @@ export default function AES() {
   const [ploting, setPloting] = useState(false);
   const [multing, setMulting] = useState(false);
 
-  const BASE_URL = "http://127.0.0.1:5000";
+  const BASE_URL = "http://139.59.70.97";
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   useEffect(() => {
     // Define the asynchronous function inside useEffect
