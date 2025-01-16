@@ -41,7 +41,7 @@ export default function AES() {
   const [ploting, setPloting] = useState(false);
   const [multing, setMulting] = useState(false);
 
-  const BASE_URL = "http://139.59.70.97";
+  const BASE_URL = "http://152.42.156.81";
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   useEffect(() => {
     // Define the asynchronous function inside useEffect
