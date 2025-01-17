@@ -21,7 +21,7 @@ export default function RSAES() {
   const [encryptionKey, setEncryptionKey] = useState<EncryptionKey>(undefined);
   const [ivector, setIV] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const BASE_URL = "http://152.42.156.81";
+  const BASE_URL = "https://prng.suryaaprakassh.me";
 
   useEffect(() => {
     const fetchEncryptionKey = async () => {
